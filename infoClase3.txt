@@ -1,0 +1,619 @@
+1. Base de datos con los roles
+
+Para ahorrar tiempo vamos a Compass, en nuestra base de datos que creamos al abrir el cluster(no admin ni local, en mi caso comisión 48),
+creamos una nueva colección que se llame rols, vamos a "Add data" y seleccionamos "insert document".
+
+- Creamos los nuevos datos en formato json:
+{"rol": "USER_ROLE"}
+
+- Repetimos el paso pero con:
+{"rol": "ADMIN_ROLE"}
+
+Cómo hacemos para acceder a esta información desde el servidor?
+Así como hicimos con usuarios, tenemos que crear un modelo
+
+- Vamos a la carpeta models y creamos un nuevo archivo:
+rols.js
+
+- importamos al igual que hicimos con usuario el Schema y model de mongoose:
+const {Schema, model} = require('mongoose')
+
+- Y luego simplemente creamos el Schema (solo vamos a crear el campo rol):
+const RolSchema = Schema({
+    rol: {
+        type: String,
+        required: [true, "El rol es obligatorio"] //booleano y mensaje de error
+    }
+})
+
+module.exports = model ("Rol", RolSchema);
+
+
+VAMOS AL SCRIPT DE ROUTES USUARIOS
+
+- Ya no vamos a utilizar el check de rol, vamos a hacerlo desde la base de datos.
+Para hacerlo desde la base de datos, necesitamos crearnos un check customizado.
+
+- En vez de usar el método isIn() que nos trae el check, vamos a crearnos un propio método 
+que le vamos a mandar al check diciendole que cuando checkee rol, se ejecute ese método para validarlo.
+
+---
+
+- Creamos una carpeta llamada helpers con un archivo que se llame db-validators.js
+En este archivo vamos a poner funciones que nos van a permitir validar datos antes de guardarlos en la base de datos
+
+- Como yo voy a validar el rol y quiero hacer de alguna manera una conexión con la base de datos,
+necesito el modelo por lo que hay que importarlo en el archivo:
+const Rol = require('../models/rol')
+
+- Al traer el modelo esto ya nos va a permitir conectarnos a la base de datos
+Cómo lo vamos a hacer? Creamos una función:
+const esRolValido = async () =>{
+
+}
+
+Va a ser una función asíncrona porque nosotros vamos a consultar a la base de datos
+a su vez recibe el rol que le está mandando el usuario
+
+VAMOS AL SCRIPT DB-VALIDATORS
+
+const esRolValido = async (rol) => {
+
+    //!En esta variable vamos a hacer una búsqueda del rol por params
+    //!que estamos recibiendo en la base de datos
+    //?El método findOne() busca una coincidencia
+    const existeRol = await Rol.findOne({rol})
+
+    //*Si no existe el rol, no puedo devolver un response
+    //*por lo que vamos a utilizar el throw new Error
+    //?Es la respuesta del servidor a la consola(frontend)
+    if(!existeRol){
+
+        throw new Error(`El rol ${rol} no existe en la base de datos`)
+        //*Mandamos por mensaje que el rol recibido no existe
+    }
+};
+
+- Luego de creada la función, exportamos pero como no va a ser la única validación que creemos,
+vamos a decir que es igual a un objeto que adentro va a llevar el método:
+module.exports = {
+    esRolValido,
+}
+
+- A dónde lo vamos a usar? Dijimos que queríamos validarlo antes de que se guarde en la db
+y ese antes quién lo maneja?... la ruta
+
+- VAMOS A USUARIOS ROUTES, comentamos el check de rol que ya no vamos a usar y 
+hacemos nuestro check customizado:
+//*Mandamos el campo que queremos validar pero ya no le vamos a mandar mensaje,
+    //*sino que le pasamos el método customizado que creamos mediante el método custom
+    check("rol").custom(esRolValido),
+
+- Suele importarse automáticamente sino tenemos que importarlo nosotros
+
+- Esto significa que ya no vamos a tener que hacer una cosa en el modelo de usuario,
+en rol le hab+iamos pasado el enum quien pasaba los datos válidos del campo.
+Ya no lo vamos a necesitar porque ahora lo vamos a manejar con la base de datos
+
+- VAMOS A MODELS/USUARIO y comentamos en rol: enum
+
+- Probamos en Postman:
+Creamos un nuevo usuario y le cambiamos el rol a uno inexistente
+{
+    "nombre": "test",
+    "correo": "test@gmail.com",
+    "password": "123456",
+    "rol": "INVITE_ROLE"
+}
+
+Luego probamos poniendo un rol existente y vemos que si se creó.
+Chequeamos en Compass
+
+
+------------
+
+2. Creamos validación customizada de Email
+
+- Si vamos a usuariosControllers, en post, podemos hacer
+esa validación de email customizada también
+
+- Copiamos el código
+ const existeEmail = await Usuario.findOne({correo});
+    if(existeEmail){
+        return res.status(400).json({
+            msg:"El correo ya existe"
+        });
+    }
+
+- Lo pegamos en db-validators.
+A ese código tenemos que ponerlo en una función al igual que hicimos con rol.
+
+- Creamos la función: 
+const emailExiste = async() => {}
+
+- Qué dato recibe esta función?... correo
+const emailExiste = async(correo) =>{}
+
+- Para poder hacer la búsqueda, tenemos que importar el modelo de usuario:
+const Usuario = require('../models/usuarios');
+
+- En esta función si el correo existe estamos haciendo referencia al response
+pero no tenemos acceso al response porque es una función común de js, entonces 
+hacemos lo mismo que hicimos en la función de rol con el throw new error
+
+- Copiamos y pegamos de la función de arriba y le cambiamos la respuesta
+        throw new Error(`El correo ${correo} ya se encuentra registrado`);
+
+- Exportamos la función 
+module.exports = {
+    esRolValido,
+    emailExiste
+}
+
+- Lo que tenemos que hacer ahora es ir de nuevo a la RUTA DE USUARIO
+y como hicimos con el check custom de rol valido:
+    check("correo").custom(emailExiste),
+
+- Chequeamos que se haya importado.
+
+- Comentamos la función del post en usuariosControllers
+
+- Probamos en Postman con el último usuario creado 
+
+- Probamos con un usuario nuevo, con nuevo mail:
+{
+    "nombre": "test1",
+    "correo": "test1@gmail.com",
+    "password": "123456",
+    "rol": "USER_ROLE"
+}
+
+
+---------------
+
+3. Quitar datos de la respuesta json
+
+- Si vamos a Postman vemos que al crear un usuario, mongo devuelve la password y 
+un dato de versión, no queremos ver esos datos sobretodo password, más alla de que esté encriptada
+
+- VAMOS A MODELOS DE USUARIOS
+
+- Para poder quitar los datos de la respuesta de json que viene de la base de datos
+vamos a usar el Schema de usuario.
+Schema tiene una propiedad llamada methods y esta propiedad a su vez, tiene una 
+llamada toJSON:
+UsuarioSchema.methods.toJSON =
+
+- Para poder cambiar esa respuesta, vamos a asignarle una función y
+vamos a desestructurar del objeto que creemos con un método:
+UsuarioSchema.methods.toJSON = function() {
+    const {} = this.toObject()
+}
+
+El método toObject hace referencia del objeto que vamos a crear de este modelo(UsuarioSchema)
+
+- Qué vamos a desestructurar? lo que viene de respuesta de la base de datos
+UsuarioSchema.methods.toJSON = function() {
+    const {__v, password,} = this.toObject()
+}
+
+- Cómo hago para decirle que si bien voy a quitar esos elementos, quiero quedarme con todo lo otro? 
+Para eso vamos a utilizar el operador spread
+const {__v, password, ...usuario} = this.toObject()
+
+Yo quiero que el resto se guarde en un objeto llamado usuario
+
+- Y ahora retornamos usuario:
+UsuarioSchema.methods.toJSON = function() {
+    const {__v, password,...usuario} = this.toObject();
+    return usuario;
+}
+
+- Con este usuarioSchema.methods.toJSON le voy a asignar una función que va 
+retornar solamente lo que quedó en usuario del objeto que se cree con este modelo 
+
+- Probamos en Postman creando un nuevo usuario: 
+{
+    "nombre": "test2",
+    "correo": "test2@gmail.com",
+    "password": "123456",
+    "rol": "USER_ROLE"
+}
+
+Vemos que __v y password ya no aparecen
+
+
+--------------
+
+4. Petición Put
+
+- Si vamos a RUTA/USUARIOS vemos que está recibiendo como parámetro el id, 
+por lo que de alguna manera tenemos que obtener el usuario que vamos a actualizar
+
+- Cómo tomamos el id de la ruta? Primero que nada, vamos a empezar a guardar las peticiones que vamos creando
+No queremos estar escribiendo en Postman el body cada vez que hagamos una petición, lo queremos dejar guardado.
+Para eso podemos crear una colección para las respuestas.
+
+- Le damos a Create Collection, le ponemos un nombre, por ej rolling, volvemos a la petición post
+y le damos al botón save, al nombre de la request le ponemos POST: Usuario, elegimos la colección rolling
+y guardamos.
+Ahora a la izquierda nos aparece esa nueva petición Post guardada, si cerramos la que tenemos abierta
+y le damos click a la nueva petición se abre.
+
+- Vamos a hacer lo mismo con todas las peticiones, copiamos la ruta
+y vamos a la petición put pero en la ruta le tenemos que agregar un id.
+
+- Vamos a Compass y copiamos el id de cualquier user creado:
+localhost:8080/api/usuarios/64c1d78d5af16fa105b1392
+
+Esta sería una petición put
+
+- Cuando nosotros hagamos la petición deberíamos obtener de alguna manera ese id
+pero necesitamos consultarle a la base de datos
+
+- Cómo lo hacemos?... Desde el controlador
+
+- VAMOS A usuariosControllers a la petición put
+
+- Recuerden que req viene de request, es decir lo que manda el frontend,
+entonces sería el frontend sería quien nos manda el id
+
+- Para obtener ese id, como sabemos que el parámetro en el que viene ese dato se llama id
+porque lo definimos en la ruta entonces ya sabemos que con req podemos obtener ese id.
+Simplemente tenemos que desestructurar id de la request.params:
+const {id} = req.params
+
+- La request tiene una propiedad llamada params donde vienen todos los parámetros
+que yo estoy mandando por la dirección en este caso es el id
+
+- En la response json tenemos que agregar el id:
+res.json({
+        message: "Put users",
+        id,
+    })
+
+- Guardamos cambios, volvemos a Postman y le damos send. Vemos que obtenemos el id y si está funcionando.
+
+- Cómo hacemos para obtener los datos a actualizar? 
+
+- VAMOS A usuariosControllers
+
+- Supongamos que queremos traer la password, el correo para actualizar recordando que vienen de la req.body:
+ const {password, correo} = req.body;
+
+ - Y nuevamente al resto lo traemos con un spread operator
+ const {password, correo, ...resto} = req.body
+
+ - Ahora, si actualizamos la password no la podemos guardar como el nuevo cambio en la base de datos
+ Qué hay que hacer?... encriptarla nuevamente. También debemos buscar al usuario y actualizarlo
+
+ - Nosotros ya sabemos encriptar el password, vamos a hacer lo mismo que en el post
+ con la diferencia de que no tenemos usuario, entonces vamos a almacenar esa info en el resto (usuariosControllers):
+    const salt = bcrypt.genSaltSync(10);
+    resto.password = bcrypt.hashSync(password, salt);
+
+- Una vez que tenemos el password, ahora solo queremos buscar al user y actualizarlo:
+    const usuario = await Usuario.findByIdAndUpdate(id, resto);
+
+Y le agregamos el async a la petición
+
+- Entonces a la constante le pasamos el modelo y un método del modelo que es findByIdAndUpdate()
+que recibe como parámetro le id que vamos a buscar y luego la info que queremos actualizar
+
+- Cómo hago para saber si viene la contraseña nueva?:
+    if(password){
+        const salt = bcrypt.genSaltSync(10);
+        resto.password = bcrypt.hashSync(password, salt);
+    }
+
+- Pasamos el usuario a la response:
+    res.json({
+        message: "Put users",
+        usuario,
+    })
+
+- Probamos en Postman cambiandole el nombre y pass al usuario:
+{
+    "nombre": "Roberta",
+    "password": "ibelieveicanfly"
+}
+
+Comprobamos en Compass que los datos se cambiaron
+
+- En Postman los datos que nos devuelve son los viejos porque no le estamos diciendo al servidor
+que la respuesta sea con los datos actualizados. 
+Para poder decirle al servidor que nos devuelva los datos actualizados,
+a usuario podemos pasarle un tercer parámetro: 
+    const usuario = await Usuario.findByIdAndUpdate(id, resto, {new:true});
+
+
+--------
+
+5. Validación de petición put
+
+- Qué pasa si modifico el id por uno que no existe en la base de datos?
+Probamos en POSTMAN
+Nos sale usuario actualizado pero null porque no tenemos ningún usuario con ese id en la bd
+
+- Esto significa que vamos a tener que hacer validaciones para el put también
+Dónde hacíamos esto?... en las rutas
+
+- VAMOS A RUTAS/USUARIO put
+
+- En la ruta del put vamos a agregar algunos check.
+Por lo menos vamos a agregar 3 validaciones que son:
+    a. Que el id válido de mongo: 
+        check("id", "No es un ID válido").isMongoId(),
+    b. También necesiamos validar el rol porque podríamos tener a alguien que pase de user a admin,
+    nosotros ya sabemos como validarlo, cómo se hacía?...:
+        check("rol").custom(esRolValido)
+    Al igual que hicimos en Post copiamos ese check.
+    c. Ahora qué pasa si el id es de un formato válido de mongo pero no devuelve ningún
+    usuario? nos saldría un null como ya vimos y no queremos que un dato así pase a la bd.
+    Para eso vamos a volver a la DB-VALIDATORS y vamos a crear un check customizable:
+
+        //*Como va a ser una función que va a chequear a la base de datos, va a ser asíncrona
+        //*y va a recibir al id
+        //?No vamos a usar el findOne porque hay un método exclusivo para buscar ids
+        const usuarioExiste = async () =>{
+
+            //* Entonces creamos una constante que va a almacenar la respuesta de la búsqueda,
+            //*llamamos al Usurio y le pasamos como parámetro el id
+            const existeUsuario = await Usuario.findById(id);
+
+            //*Entonces preguntamos
+            //?Si no existe el usuario con ese id colocamos un throw new error
+            if(!existeUsuario) throw new Error(`El id ${id} no corresponde a ningún usuario registrado`);
+        }
+
+    Exportamos la función:
+    module.exports = {
+    esRolValido,
+    emailExiste,
+    usuarioExiste
+}
+
+    Entonces esta función recibe el id, lo busca, si no lo encuentra nos pasa este error
+
+    Volvemos a las RUTAS y le agregamos el check:
+        //*Validamos el id y vamos a decir que es custom pasándole el usuarioExistente
+        check("id").custom(usuarioExiste)
+
+    Chequeamos que esté importado
+
+    d. Ahora como último paso, lo que nos está faltando es obtener los errores, entonces 
+    como hicimos en rol, le pasamos la función validarCampos.
+    Por qué agregamos la función validarCampos? Porque esta función toma los errores,
+    si es que hay, y los muestra y si no hay, continua con el controlador.
+
+- Probamos en Postman y nos devuelve el error de que no es un id válido
+y también un error que nos devuelve la base de datos
+
+
+---------------
+
+6. Petición GET
+
+- Para qué servía el get?... sirve para traer datos, es decir para traernos datos
+que el servidor ya tiene entonces no tiene mucho sentido que tenga validaciones
+entonces nos vamos a centrar en la información que queremos traer.
+
+- Si vamos a usuariosControllers vemos que el usuariosGet nos va a traer toda la información,
+es decir, toda la info de los usuarios que hayan. 
+Para hacer eso tenemos que tener en cuenta que capaz mi base de datos tiene un montón de usuarios
+y eso puede demorar mucho tiempo y de ahí viene lo de la paginación
+pero antes vamos a ver como traer los usuarios.
+
+- Cómo hacemos eso? Primero sacamos esta query que ya no la vamos a utilizar: 
+    const {apiKey, limit} = req.query;
+
+- Ahora pasamos a la función para traer los usuarios:
+    //traer todos los usuarios
+    //*Creamos una variable, hacemos una petición a la base de datos,
+    //*utilizamos el modelo con el método find() que nos va a buscar a todos
+    //? podemos el async a la función get
+    const usuarios = await Usuario.find()
+
+- Y en la respuesta, vamos a cambiar el mensaje y pasarle solamente usuarios:
+     res.json({        
+        usuarios
+    })
+
+- Probamos en Postman en la petición GET, controlamos que el id no esté en la ruta 
+Vamos a ver que en la respuesta nos trae a todos los usuarios
+
+- Pero cómo hacemos si tenemos por ej 2 millones de usuarios? La paginación nos sirve 
+para decirle a la base de datos desde que registro queremos traer datos y cuántos voy a traer.
+Por ejemplo: quiero traer desde la posición 0 en adelante y solamente 10.
+Entonces nos traería desde la posición 0 al 9.
+
+- Lo primero que tenemos que hacer es definir es que esos datos van a venir Como
+consultas dentro de la petición. Si volvemos a Postman donde dice Query Params
+(pruebo poniendo "desde" en key, "0" en value. Abajo: "limite" en key y "5" en value)
+Vemos como la dirección se va modificando
+
+- Entonces cómo le decimos al backend que me traiga lo que está en desde y lo que está en límite? 
+Para eso vamos a utilizar el req.query que sería de donde viene nuestra consulta a la ruta.
+Sabemos que tenemos un desde y un límite, que son los que vamos a definir en la función: (usuariosControllers):
+    const {desde, limite} = req.query;
+
+- Ahora cómo hacemos para decirle al find() que queremos que tenga en cuenta el desde y el limite en el registro
+Hay dos métodos que podemos agregarle al find():
+    a. Uno es el método skip() donde le vamos a pasar "desde" como valor:
+        const usuarios = await Usuario.find().skip(desde)
+    
+    El skip sería desde qué registro quiero empezar a mostrar los datos.
+
+    b. Luego le podemos concatenar el método limit() donde vamos a asignarle "limite":
+        const usuarios = await Usuario.find().skip(desde).limit(limite);
+
+    Solo haciendo esto ya estamos limitando al find para que nos muestre de acuerdo
+    a los valores que le pasemos con el desde y el límite.
+
+- Probamos en Postman y ya con esto podemos hacer una paginación
+
+- Ahora, estaría bueno que nos pueda mostrar el total de registros que tenemos porque
+capaz no sabemos cuantos son y necesitamos para hacer la paginación.
+
+- Para obtener el total, vamos a crear otra consulta a la base de datos:
+    //*Creamos la variable, hacemos la petición, llamamos al modelo
+    //* y vamos a utilizar un método que es countDocuments() que nos va a
+    //*traer el total de los registros
+    const total = await Usuario.countDocuments();
+
+- Y lo pasamos como respuesta:
+     res.json({        
+        total,
+        usuarios
+    })
+
+Aunque la petición me esté mostrando 5, total me debería mostrar el número
+total de los registros.
+
+- Probamos en Postman y vemos como sale total:10
+
+- Veamos si es verdad, vamos a Post y nos creemos otro usuario nuevo y 
+luego hagamos la petición en Get otra vez.
+
+- Ahora, si vemos en la respuesta, arriba donde dice 200k, al lado dice Time y que demoró x
+cantidad de milisegundos, por más que sea poco hay una forma de optimizarlo.
+
+- Si volvemos a la petición Get (IR A usuariosControllers) vemos que tenemos dos promesas,
+la primera donde le pedimos a la base de datos que nos traiga los usuarios y la 
+segunda que nos pase el total de registros. 
+Hay una forma de hacer que estas dos promesas se hagan al mismo tiempo, para eso
+vamos a desestructurar un arreglo:
+
+    //*Vamos a desestructurar un arreglo que va a venir del await,
+    //*y vamos a usar el método Promise.all() que significa que resuelva todas las promesas
+    //* y adentro del método le pasamos un arreglo con las promesas hechas anteriormente
+    //? vamos a desestructurar lo que queremos que nos devuelva cada promesa,
+    //?la primera queremos que nos devuelva un valor en una variable llamada total y la segunda una var usuarios 
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments(),
+        Usuario.find().skip(desde).limit(limite)
+    ])
+
+Entonces, el Promise.all es un arreglo de promesas, a donde vamos a almacenar
+lo que resuelva la primera promesa? en total por eso estamos desestructurando
+Lo mismo con la segunda. 
+
+- Probamos en Postman
+En el caso de que tengan que hacer peticiones complejas les va a servir esto
+
+- El problema es que ahora cuando veamos la petición delete, 
+vamos a tener que modificar un poco esto porque no estamos contemplando si los 
+usuario estén en true o false, solo estamos mostrando todos
+
+- Probamos en Compas cambiándole el estado a algún usuario a false y luego pasándolo por Postman.
+Lo ideal sería que no nos muestre eso porque serían usuarios que están inactivos
+y no los queremos ver en la petición
+
+
+--------------
+
+7. Petición Delete
+
+- VAMOS A USUARIOSCONTROLLERS
+
+- El delete al igual que el put necesita obtener el id, entonces
+como ya lo hicimos en el put vamos a copiar y pegar esto: 
+    const {id} = req.params;
+
+- Si vamos a las rutas el delete está recibiendo el id
+
+- Ahora tenemos que buscar al usuario que está recibiendo al id y eso también lo hicimos
+en el db-validators pero vamos a hacer algo parecido en el Delete:
+    //*vamos a crear una constante y vamos a ponerle el await,
+    //*llamamos al modelo de Usuario junto con el método findById()
+    //? es decir que busque un usuario por el id
+    const usuario = await Usuario.findById()
+
+- Esto simplemente lo vamos a utiizar para ver el estado del usuario, 
+si el usuario está en false no vamos a hacer nada porque está inactivo:
+    //*Si yo tengo un usuario por el id y el estado está en falso,
+    //* que nos retorne un mensaje json
+    if(!usuario.estado){
+        return res.jason({
+            msg: "El usuario ya está inactivo"
+        });
+    }
+
+- Pero si el usuario está en true, vamos a crear una variable:
+    //*Para desactivar al usuario, creamos la variable, le pasamos el modelo
+    //*junto al método para que encuentre el id y lo actualice.
+    //* Le pasamos el id del usuario y el estado para que cambie
+    const usuarioInactivado = await Usuario.findByIdAndUpdate(id,{estado:false});
+
+Ahí le estamos diciendo que cuando encuentre el id lo actualice y lo pase a false
+
+- En la respuesta le podemos cambiar el mensaje y también pasarle
+los datos del usuario inactivado:
+     res.json({
+        message: "Usuario Inactivo",
+        usuarioInactivado
+        })
+
+- Y si queremos que se guarden los datos actualizados en la respuesta, cómo se hacía?
+Agregamos el {new:true}:
+    const usuarioInactivado = await Usuario.findByIdAndUpdate(id,{estado:false}, {new:true});
+
+- Probamos en Postman, copiamos la dirección del put trayendo el id del usuario
+que modificamos el estado en false y vemos que nos sale que ya esta inactivo
+
+- Volvemos a Compass le cambiamos a true al usuario y lo inactivamos en Postman
+
+- Qué pasa si solo queremos borrar el registro y no inactivarlo? 
+Si quisieramos borrar el usuario no nos haría falta esto último que estuvimos haciendo:
+     const usuario = await Usuario.findById(id);
+    
+    if(!usuario.estado){
+        return res.json({
+            msg: "El usuario ya está inactivo"
+        });
+    }
+
+    const usuarioInactivado = await Usuario.findByIdAndUpdate(id,{estado:false}, {new:true});
+
+- Comentamos el código y creamos una variable nueva para eliminar el registro:
+    const usuarioBorrado = await Usuario.findByIdAndDelete(id);
+
+- Lo pasamos a la respuesta:
+     res.json({
+        message: "Usuario Inactivo",
+        usuarioBorrado
+        // usuarioInactivado
+        })
+
+- Probamos en Postman y nos fijamos que lo borro
+
+- No es una buena práctica eliminar registros de la base de datos
+
+- Volviendo al Get, queremos que solo nos muestre los usuarios activos.
+Abajo de la constante donde le pasamos el desde y limite vamos a crear una nueva:
+    const query = {estado:true};
+
+- Como estamos definiendo el estado en true en esta nueva variable,
+solo nos quedaría pasarme a las promesas: 
+    Usuario.countDocuments(query),
+    Usuario.find(query).skip(desde).limit(limite)
+
+- Probamos en Compass cambiamos el estado de un usuario y probamos en Postman
+
+- Las únicas validaciones que llevaría el delete son las del id, entonces: 
+    router.delete('/:id',[
+    check("id", "No es un ID válido").isMongoId(),
+    check("id").custom(usuarioExiste),
+    validarCampos
+], usersDelete);
+
+
+
+
+
+
+
+
+
+ 
+
