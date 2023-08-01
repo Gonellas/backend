@@ -1,0 +1,402 @@
+LOGIN
+
+1. Ruta de autenticación
+
+- Cuales van a ser los pasos que le permitan al usuario loggearse con éxito?
+Devolverle un token de autorización
+
+- Vamos a el modelo del server. MODELS/server
+Así como creamos usuariosPath vamos a crear una ruta y la vamos a definir de la siguiente forma:
+    this.authPath = "/api/auth"
+
+- Ya definido el path le tenemos que decir a nuestro servidor cómo hacemos
+para llegar a ese path, es decir a qué ruta está asignado el path.
+
+Eso le vamos a decir en routes(), haciendo algo similar a lo que tenemos ahí.
+Copiamos y pegamos: 
+    this.app.use(this.usersPath, require ('../routes/usuarios'));
+
+y reemplazamos:
+    this.app.use(this.authPath, require ('../routes/auth'));
+
+Esto sería lo único que haríamos en el server.js
+
+Entonces, todas las rutas que necesitemos agregar, irían en el server.js
+Tendríamos que agregar el path y luego en routes() agregar la ruta a donde 
+nos llevaría ese path.
+
+- El próximo paso a seguir es crear un archivo nuevo en la carpeta routes:
+    auth.js
+
+- En ete nuevo archivo vamos a hacer algo muy parecido a lo que hicimos también
+en la ruta de usuario. Entonces qué necesitamos?
+
+- Vamos a importar el Router: 
+    const {Router} = require ('express');
+
+- También vamos a llevar la variable router y la petición de get:
+    const router = Router();
+    router.get('/', usersGet);
+
+- También tenemos que exportar el router: 
+    module.exports = router;
+
+- No va a ser una petición get porque nosotros queremos autenticarnos,
+entonces necesito enviarle información desde el front al back.
+
+Qué tipo de petición tendría que ser? ... post:
+    router.post('/', usersGet);
+
+- A qué ruta? (VAMOS A POSTMAN)
+
+- Yo quiero que mi ruta sea:
+    http://localhost:8080/api/auth/login
+
+Esta sería nuestra ruta si queremos un login, hacemos un post
+
+- Si volvemos al server (MODELS/SERVER), ya definimos la ruta como /api/auth por lo tanto,
+si queremos que nuestra ruta sera /api/auth/login, en la ruta (ROUTES/AUTH)
+Tenemos que agregarle el /login:
+    router.post('/login', usersGet);
+
+Como podemos tener otros tipos de autenticación, tenemos que agregarle ese login.
+
+- Ahora, a qué controlador nos vamos a referir? Acuerdense que el controlador
+era quien se encargaba de todo, en este caso recibir los datos de correo y password,
+chequear que esté en la base de datos y recibir el token.
+
+Como todavía no lo tenemos, lo vamos a definir como login:
+    router.post('/login', login);
+
+- Para que esto funcione, tenemos que tener el controlador.
+
+
+----------------
+
+2. Controlador
+
+- Como primer paso vamos a crear el controlador en nuestra carpeta de Controllers:
+    auth.js
+
+- Repasemos que instalamos en el controlador de usuarios, habíamos importado
+el response y el request, copiamos y pegamos en el controlador de auth:
+    const {response, request} = require('express');
+
+- Ahora necesitamos la función del controlador:
+ //*Creamos la función que recibía como parámetro al res y req
+ const login = (req = request, res = response) =>{
+
+ }
+
+ - Y para no olvidarnos lo exportamos: 
+    module.exports = {
+        login
+    }
+
+- Por el momento solo vamos a devolver una respuesta en formato json
+que diga en un mensaje: 
+    const login = (req = request, res = response) =>{
+    res.json({
+        msg: "Login OK",
+    });
+}
+
+Entonces cualquier alguien ponga la ruta de la petición post, le tendría 
+que salir el mensaje.
+
+- Vamos a ROUTES/AUTH.
+
+- Para poder usarlo tenemos que importar nuestra función login del controlador.
+    const { login } = require('../controllers/auth');
+
+- Vamos a POSTMAN y vemos si funciona
+
+- La idea ahora es que esto venga de un formulario donde nosotros obtengamos los datos.
+Entonces, en el controlador, antes de la respuesta, sería bueno obtener esos datos.
+Esos datos vendrían en el cuerpo de la respuesta.
+
+- Vamos a body, raw, json y simulamos una respuesta:
+    {
+        "correo":"test1@test.com",
+        "password":"123456"
+    }
+
+- Tendriamos que desestructar el req:
+    //*del cuerpo de la petición obtenemos el correo y el password
+    const {correo, password} = req.body;
+
+- Para probar podríamos agregar el correo y el password a la respuesta:
+    res.json({
+        msg: "Login OK",
+        correo, 
+        password
+    });
+
+- Probamos en POSTMAN
+
+- Esto no basta simplemente con recibirlo.
+Cuando hagamos la petición se pueden generar errores como por ej, 
+un error del servidor.
+Para poder manejar estos errores vamos a utilizar el try catch en caso
+de que el error venga de parte nuestra: 
+    try {
+        
+    } catch (error) {
+         //*le pasamos la respuesta, y como es un error de nuestro servidor
+        //*le pasamos un status con el código
+        //*le agregamos el json porque va a ser devuelvo en ese formato
+        //*y le pasamos un mensaje para que el front nos pueda avisar
+        return res.status(500).json({
+            msg: "Hable con el administrador"
+        })
+    }
+
+- Para que del lado del back podamos recibir el error vamos a poner
+que nos devuelva en consola:
+    catch (error) {
+        console.log(error);}
+
+- El primer response que hicimos con el mensaje de login Ok,
+debería ir dentro del try, porque recordemos la función del try catch,
+si todo funciona bien se ejecuta el try y en caso de que no, el error del catch:
+    try {
+
+        res.json({
+            msg: "Login OK",
+            correo,
+            password
+        });
+    }
+        
+- Que tenemos que hacer para nuestro login?
+    . Verificar si el correo existe
+    . El usario está activo
+
+Si el correo existe y el usuario está activo tenemos que verificar:
+    . Verificar la contraseña
+
+Aca tenemos un inconveniente porque el usuario la manda como string
+pero nosotros la recibimos encriptada entonces tenemos que ver cómo
+hacer la comparación
+
+Y por último:
+    . Generar el token
+
+- Para chequear el correo tenemos que conectarnos a la colección de usuarios,
+pero si queremos consultarle al modelo de usuario qué tenemos que hacer primero?...
+Importarlo: 
+    const Usuario = require('../models/usuarios');
+
+    //1.Verificar si el correo existe
+    //*Para verificar tenemos que almacenar la respuesta
+    //*Llamamos al modelo, utilizamos el método findOne()
+    //*que buscaba un dato y le pasamos el correo
+    //?como estamos haciendo una petición a la base de datos,
+    //?la función tiene que ser asíncrona
+        await Usuario.findOne({correo})
+
+- Ahora tenemos que crear una variable para almacenar estos datos:
+    const usuario = await Usuario.findOne({correo})
+
+- Si no encuentra un usuario con este correo entonces el correo es incorrecto:
+    if(!usuario){
+        return res.status(400).json({
+            msg:"Correo o password incorrectos"
+        })
+    }
+
+- Probamos en POSTMAN con el usuario correcto que ya tenemos en db:
+    {
+    "correo":"test1@gmail.com",
+    "password":"123456" 
+    }
+
+- Luego probamos con un usuario incorrecto: 
+    {
+    "correo":"test1000@gmail.com",
+    "password":"123456"
+    }
+
+- Es necesario traer los datos de nuevo de la db para saber si el user
+está activo?.. no porque ya tenemos la variable que trae la respuesta.
+Lo único que tenemos que hacer es un if:
+    //*Si el usuario no está activo, devolveme esta respuesta/error
+        if(!usuario.estado){
+            return res.status(400).json({
+                msg:"Correo o password incorrectos | Usuario inactivo"
+            })
+        }
+
+- Si vamos a Compass, le cambiamos a false el estado a test1 y probamos
+en POSTMAN
+
+- Ahora tenemos que verificar la contraseña, pero recordemos que 
+está encriptada. Vamos a tener que importar la librería de bcrypt
+porque vamos a utilizar una de sus herramientas:
+    const bcrypt = require('bcryptjs');
+
+- Para verificar la contraseña vamos a crear una variable para almacenar
+la respuesta:
+    //*Creamos la variable para almacenar la respuesta
+    //* y vamos a llamar a la librería y vamos a utilizar el método
+    //*compareSync() que nos pide un string que sería el pass que recibimos
+    //*del usuario y como segundo valor el hash string que ya lo tenemos 
+    //*guardado en el usuario entonces lo llamamos como usuario.password
+        const validPassword = bcrypt.compareSync(password, usuario.password);
+
+Entonces este método toma el password que recibimos y luego toma el hash,
+es decir el password cifrado. Esto nos devolvería un booleano. True Cuando
+la comparación es correcta y false cuando no lo es.
+
+Entonces preguntamos:
+    if(!validPassword){
+           return res.status(400).json({
+             msg:"Correo o password incorrectos"
+         })
+       }
+
+- Probamos en POSTMAN con un usuario correcto:
+    {
+    "correo":"test2@gmail.com",
+    "password":"123456"
+    }
+
+- Probamos con la contraseña incorrecta:
+    {
+    "correo":"test2@gmail.com",
+    "password":"1234567"
+    }
+
+- Antes de hacer el token estaría bueno hacer algunas validaciones en la ruta.
+Importamos check en ROUTES/AUTH:
+    const {check} = require('express-validator');
+
+Solo vamos a chequear que el correo venga en un formato de correo
+y que el password no venga vacío:
+    check("correo", "El correo no es válido").isEmail(),
+    check("password", "La contraseña es obligatoria").notEmpty(),
+
+- Que nos faltaría ahora?... el validarCampos, este middleware 
+obtenía los errores de los check. Entonces lo importamos y lo mandamos
+después del último check:
+    check("correo", "El correo no es válido").isEmail(),
+    check("password", "La contraseña es obligatoria").notEmpty(), 
+    validarCampos
+
+- Probamos en POSTMAN sin correo y luego sin password
+
+----
+
+TOKEN
+
+- La idea es que si se loggea correctamente el usuario sería que 
+no solo nos devuelva el mensaje de login Ok sino que devuelva también el token.
+
+- Vamos a instalar una librería que se llama Json Web Token:
+    npm i jsonwebtoken 
+    https://www.npmjs.com/package/jsonwebtoken
+
+Funciona de esta forma:
+    - Llamamos a jwt
+    - Utilizamos su método sign()
+    - Recibimos payload que son los datos que queremos que almacene
+    - Mandamos la secretOrPrivateKey => clave privada
+    - y se pueden pasar un par de opciones, donde podemos definir la fecha
+    de expiración
+
+    jwt.sign(payload, secretOrPrivateKey, [options, callback])
+
+- Vamos a crear una constante a la cual le vamos a pasar una función
+que nos permita crear el token, entre paréntesis le vamos a mandar cual
+es el dato que queremos que guarde en el payload, en este caso le vamos a 
+pasar solo el id:
+    const token = await generarJWT(usuario.id);
+
+- Cuando se resuelva esta función vamos a almacenar el token en la constante
+que creamos entonces al token tenemos que mandarlo como respuesta: 
+    res.json({
+        msg: "Login OK",
+        token
+    });
+
+- Esta función nos va a servir para generar el jwt por lo tanto la vamos
+a poner en un helper. Cremaos el archivo en HELPERS:
+    generar-jwt.js
+
+- Entonces generamos la función que va a recibir el user id:
+    const generarJWT = (uid) =>{
+
+}
+
+- La exportamos: 
+    module.exports = {
+    generarJWT
+    }
+
+- Tenemos que importar la librería: 
+    const jwt = require('jsonwebtoken');
+
+- Para poder generar el token vamos a tener que hacer uso de una promesa:
+    const generarJWT = (uid) =>{
+
+        //*Retornamos una promesa, esta promesa recibe dos métodos
+        //* resolve y reject
+        //?Cuando se genera el token correctamente lo devolvemos con resolve
+        //? y si da un error devolvemos con reject
+        return new Promise((resolve, reject) =>{})
+    }
+
+- Luego creamos el payload:
+    return new Promise((resolve, reject) =>{
+
+        //Crear el payload
+        //*recibimos el user id
+        const payload = {uid};
+    })
+
+- Luego el token: 
+    //generar jwt
+    //*Lo hacemos con la documentación mostrada previamente
+    //*generar la secretOrPrivateKey
+    //!No queremos que esto se suba a github entonces lo mandamos a .env
+        jwt.sign(payload,)
+
+** Creamos una variable de entorno en el archivo .env y le ponemos cualquier clave:
+    SECRETORPRIVATEKEY = 3st03sLapr1vateK3y48i
+
+    //!No queremos que esto se suba a github entonces lo mandamos a .env
+        //?Para usarla llamamos a process.env.SECRET.. 
+        jwt.sign(payload, process.env.SECRETORPRIVATEKEY,)
+
+- Luego vienen las opciones como tercer parámetro: 
+    //*Como tercer valor mandamos las opciones entre llaves
+    //*cuando expira y luego viene el callback
+        jwt.sign(payload, process.env.SECRETORPRIVATEKEY, {
+            expiresIn:"4h"
+        })
+
+- Y por último va el callback que recibe la respuesta, si es un error o si
+es el token:
+    //*Como tercer valor mandamos las opciones entre llaves
+    //*cuando expira y luego viene el callback
+        jwt.sign(payload, process.env.SECRETORPRIVATEKEY, {
+            expiresIn:"4h"
+        }, (err, token)=>{
+            //*preguntamos si viene el error que devuelva un mensaje en consola
+            //*mostrandolo pero devolvemos con un reject el error
+            if(err){
+                console.log(err);
+                reject("No se puede generar el token")
+            } else{
+                resolve(token);
+            }
+        })
+
+
+
+
+
+
+
+
+

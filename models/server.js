@@ -10,6 +10,7 @@ class Server{
         //en vez de hacer la constante con app la traemos con el constructor
         this.app = express();
         this.port = process.env.PORT;
+        this.authPath = '/api/auth'
         this.usersPath = '/api/usuarios';
 
         //conectar con base de datos
@@ -40,7 +41,7 @@ class Server{
     //para hacer la peticion creamos una funcion
     //esta funcion va a manejar todas las rutas que necesitemos de nuestro servidor
     routes(){
-
+        this.app.use(this.authPath, require ('../routes/auth'));
         this.app.use(this.usersPath, require ('../routes/usuarios'));
 
         // //!como no tengo la variable app la tengo que llamar con this 
