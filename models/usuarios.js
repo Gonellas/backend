@@ -2,6 +2,7 @@
 
 const {Schema, model} = require('mongoose');
 
+
 const UsuarioSchema = Schema({
     nombre: {
         type: String,
@@ -32,7 +33,8 @@ const UsuarioSchema = Schema({
 
 //Quitar datos en la respuesta json
 UsuarioSchema.methods.toJSON = function() {
-    const {__v, password, ...usuario} = this.toObject();
+    const {__v, password, _id, ...usuario} = this.toObject();
+    usuario.uid = _id;
     return usuario;
 }
 //*Con este usuarioSchema.methods().toJSON le voy a asignar una función que va 

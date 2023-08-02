@@ -392,8 +392,315 @@ es el token:
             }
         })
 
+- Probamos en POSTMAN
+
+------------
 
 
+- Ahora tenemos que decirle al backend que para que el usuario pueda hacer
+una petición tenga que estar autenticado.
+Si al controlador le agregamos que nos devuelva el usuario, nos devuelve el id
+cuando nosotros necesitamos el parámetro que le pasamos a generarJWT que es uid:
+        res.json({
+            msg: "Login OK",
+            token,
+            usuario
+        });
+
+- VAMOS A MODELS/Usuario
+
+- Si vamos al modelo de usuario habiamos visto como quitar datos a la respuesta json.
+Si queremos hacer que el id aparezca como uid, solo hay que sacar el id: 
+    const {__v, password, _id, ...usuario} = this.toObject();
+
+Y antes del return le tenemos que crear una nueva propiedad al usuario uid y lo igualamos al _id:
+    usuario.uid
+
+- Probamos en POSTMAN
+
+- Esto es un detalle, no es necesario este cambio.
+
+
+-----------------------
+
+3. Validaciones administrador
+
+- Vamos a ROUTES/USUARIO
+
+- Para proteger las rutas, por ejemplo para registrar un usuario 
+no necesito el jwt porque la idea es que cualquier usuario pueda registrarse
+por primera vez
+
+- El get de usuario sería para listar todos los usuarios pero 
+cualquier usuario podría saber de esta lista?... no, tendría que ser el admin
+Entonces haría falta que no solamente el usuario esté registrado sino que tenga
+el rol de admin y en el put, por ejemplo si es la actualización del mismo user
+entonces ese usuario si puede ver sus datos pero tendría que estar autenticado,
+lo mismo pasa con el delete, necesita estar autenticado
+
+- Entonces tenemos que hacerle las validaciones para saber si están autenticados.
+Para esto vamos a crear un nuevo middleware que nos permita validar los token,
+luego si llegó el token ver que siga siendo válido, que no expiró o que nadie lo
+manipuló
+
+- Creamos un nuevo archivo en la carpeta middlewares:
+    validar-jwt.js
+
+- Lo primero que vamos a importar es el response y request que viene de express: 
+    const {request, response} = require('express');
+
+- Y al trabajar con el token vamos a necesitar la librería de jwt:
+    const jwt = require('jsonwebtoken');
+
+- A continuación vamos a crear nuestro middleware que no es más que una función:
+    //*esta función va a recibir la req, la res y había un método
+    //*que si el middleware después de hacer todos los chequeos estaba 
+    //* todo bien, continuaba con lo demás
+    const validarJWT = (req = request, res = response, next) =>{
+    
+    }
+
+- Y antes de olvidarnos lo exportamos: 
+    module.exports = {
+    validarJWT
+}
+
+- Cuál sería la idea de esta función? Que primero verifique si está
+el jwt y luego realice los demás check, entonces si algo falla no debería seguir
+
+- Vamos a ROUTES/USUARIO en DELETE
+
+- Agregamos la función nueva validarJWT y chequeamos que se importó:
+    router.delete('/:id',[
+    validarJWT,
+    check("id", "No es un ID válido").isMongoId(),
+    check("id").custom(usuarioExiste),
+    validarCampos
+    ], usersDelete);
+
+- Vamos a VALIDAR-JWT
+
+- Si vamos a chequear el token, debemos obtenerlo: 
+    const token = ..
+
+- Cuando mandemos la petición del front tenemos que mandar el token, pero 
+donde? Los token generalmente van en la parte de Headers.
+
+- Vamos a POSTMAN y mostramos el Headers en POST DELETE
+
+- En los Headers podemos encontrar algo llamado "autorization" donde iría un
+código que es el token.
+
+- En Key definimos como lo vamos a recibir:
+    x-token
+
+- Y en el valor debería venir el token
+
+- Como este token viene de la request, tendríamos que pasar la req con el método
+headers y entre paréntesis le pasaríamos la llave que creamos:
+    const token = req.header("x-token");
+
+- Lo que tenemos que preguntar ahora es si tenemos el token:
+    //preguntar si me mandaron el token
+    //*si no viene el token devolvemos una respuesta con el error 401
+    //?el error 401 es que no está autorizado
+    //*y le pasamos también un mensaje
+    if(!token){
+        return res.status(401).json({
+            msg:"No hay token en la petición"
+        })
+    }
+
+- Antes de devolver el next, vamos a usar el try catch y trabajemos primero en el error:
+    try {
+        
+    } catch (error) {
+        //*si al hacer la busqueda del usuario hubiera un problema
+        //*le devolvemos tambien con un status 401 que el token no es valido
+        console.log(error);
+        res.status(401).json({
+            msg:"Token no válido"
+        })
+    }
+
+- Dentro del try vamos a verificar el token y obtener el id del usuario, 
+porque lo vamos a necesitar para hacer una serie de cosas. A esto lo obtenemos del payload
+porque le habíamos mandado el uid. Esto lo vamos a realizar con una herramienta
+de jwt que se llama verify:
+    //verificar token y obtener el uid
+    //*verify recibe el token y luego la llave secreta porque es la 
+    //*única forma de obtener los datos del payload de un token
+        jwt.verify(token, process.env.SECRETORPRIVATEKEY)
+
+- Esto lo podríamos almacenar en el payload: 
+    const payload = jwt.verify(token, process.env.SECRETORPRIVATEKEY);
+
+- Que vendría en el payload?... el uid y el dato de expiración del token
+
+- Como ya sabemos que viene en el payload, podríamos desestructurarlo y pasarle el uid:
+    const {uid} = jwt.verify(token, process.env.SECRETORPRIVATEKEY);
+
+- Ahora necesitamos obtener los datos del usuario y saber si está en condiciones,
+esto nos va a servir para ver verificar el rol del usuario y para ver si está activo
+
+- Ya tenemos el id pero necesitamos llamar al modelo porque sus datos están
+en la base de datos del usuario: 
+
+- Importamos el Usuario: 
+    const Usuario = require('../models/usuarios');
+
+- Entonces, creamos la variable: 
+    //obtener los datos del usuario autenticado
+    //*creamos la variable, le pasamos el await, llamamos al modelo
+    //*usamos el método findById y le pasamos el uid.
+    const usuario = await Usuario.findById(uid)
+
+- Luego de esto vamos a tener que hacer una serie de validaciones:
+    1. Validar si el usuario existe: por ejemplo qué pasa si eliminamos un usuario
+    pero el token todavía no expiró y si usamos un token de un usuario que no existe
+    tendríamos un problema de seguridad. Entonces:
+        //Verificar si el usuario existe
+        //*si el token está activo y el usuario no existe, el token no es válido
+        if(!usuario){
+            return res.status(401).json({
+                msg:"Token no válido, usuario no existe"
+            })
+        }
+    2. También tenemos que verificar si el usuario está activo:
+        //Verificar si el usuario está activo
+        if(!usuario.estado){
+            return res.status(401).json({
+                msg:"Usuario inactivo"
+            })
+        }
+    3. Si el usuario está activado: podemos almacenar los datos del usuario
+    en la request, si revisamos como funcionan las rutas y hacemos de cuenta que
+    ya tenemos el usuario validado, podemos almacenarlo en la request porque los middlewares
+    tienen acceso. Entonces, si almacenamos en la req del validarJWT los datos del usuario
+    vamos a poder acceder a esos datos desde las validaciones siguientes (ROUTES/USER DELETE).
+    Recuerden que los middlewares están entre lo que mande el usuario y lo que recibe el servidor
+    por lo tanto si tenemos una función en el medio que obtiene datos se los puede mandar
+    al servidor de otra manera. Entonces:
+        //*Ya verificando los pasos previos podemos llamar  la request y crear una
+        //*variable usuario y podemos almacenar los datos del usuario que acabamos 
+        //*de autenticar, vamos a poder acceder a esta request desde el controlador 
+        //*después
+        req.usuario = usuario;
+
+- Como último paso que nos falta?.. el next:
+    req.usuario = usuario;
+
+    next();
+
+- Agregamos el middleware en el delete, antes de los check.
+
+- Como vamos a probar esto?
+    1. Vamos a autenticarnos con test1
+    2. Copiamos el token que nos da
+    3. Vamos a la peticion DELETE a HEADERS, verificamos tener
+    la key x-token y le agregamos el token que copiamos
+    4. Ahora, vamos a copiar desde Compass el id de test2 y lo
+    reemplazamos en la ruta del delete
+
+Entonces, repasemos, en la petición del delete del usuario, puse el id del usuario
+que queremos inactivar que es el test2, agregué en los headers el x-token en la key
+y reemplace el valor con el token que nos dio cuando nos autenticamos con el test1.
+Si está todo bien, en la respuesta deberíamos recibir que el usuario fue inactivado.
+Veamos que pasa al enviar send se inactiva el usuario de test2.
+
+Volvemos a ponerle true a test2, vamos a la petición delete e inactivamos el token. 
+Si le damos send nos sale el mensaje de que no hay token en la petición.
+Si le borramos una letra al token nos sale el mensaje de token no válido.
+
+- Vamos a CONTROLLERS/usuariosControllers
+
+- Si vamos al delete, aparte de que nos mande el usuario borrado,
+queremos que nos mande el usuario atutenticado.
+Como a esos datos ya los tenemos en la request, podemos hacer lo siguiente (UsuarioDelete):
+    //*Que obtenga lo que tenemos del usuario autenticado
+    const usuarioAutenticado = req.usuario;
+
+- Y luego lo mandamos al response: 
+    res.json({
+        message: "Usuario Inactivo",
+        usuarioInactivado,
+        usuarioAutenticado
+    })
+
+- Si probamos en POSTMAN deberían salir los datos del usuario autenticado
+
+- Algo que nos está faltando es que la persona que pueda manejar esto sea el admin.
+Para eso vamos a crear un nuevo middleware.
+Añadimos un archivo en la carpeta middlewares:
+    validar-roles.js
+
+- Igual que en el JWT vamos a traer la request y response:
+    const {request, response} = require('express');
+
+- Y luego vamos a crear la función:
+    const esAdminRol = (req = request, res = response, next) =>{
+
+    }   
+
+- Exportamos: 
+    module.exports = {
+    esAdminRol
+    }   
+
+- Como ya almacenamos en la request los datos del usuario, esta función iría 
+abajo de validarJWT:
+    router.delete('/:id',[
+    validarJWT,
+    esAdminRol,
+
+- Entonces si el token es válido recién pasa a validar si tiene el rol de admin,
+si es admin rol, pasa a lo siguiente.
+
+- Como yo almacenamos los datos de la request en validarJWT, podemos hacer directamente:
+    //*si no vienen los datos del usuario es porque
+    //*no validé el token antes
+    if(!req.usuario){
+        //no validé el token antes
+    }
+
+- Pero antes de seguir con ese if, vamos a obtener dos datos del usuario.
+Vamos a desestructurarlo de la req del usuario.
+    //*vamos a traer el rol y el nombre
+    const {rol, nombre} = req.usuario
+
+- Y preguntamos:    
+    //?Entonces
+    //*si el rol que estoy obteniendo de la req del usuario
+    //* no es un admin role, le pasamos el error con el msg
+    //*sino, puede seguir sin problema
+    if(rol !== "ADMIN_ROLE"){
+        return res.status(401).json({
+            msg:`${nombre} no es administrador`
+        })
+    }
+
+    next();
+
+- Probamos cons test1 que es admin role:
+    Nos saldría el usuario inactivo y que test1 esta autenticado
+
+- Que pasa si pruebo hacer esto con un usuario que no tenga ADMIN_ROLE? 
+ 
+- Si para hacer lo mismo con el put, le mandamos solo el esAdminRole, 
+tendríamos un problema porque no pasa por el token antes, entonces 
+en el if que nos quedó vacío en validar roles iría:
+    //*si no vienen los datos del usuario es porque
+    //*no validé el token antes
+    if(!req.usuario){
+        //no validé el token antes
+        return res.status(500).json({
+            msg:"Se quiere validar el rol sin validar el token"
+        })
+    }
+
+- De todas formas en el caso del put no es necesario que para actualizar los 
+datos tenga que ser admin, entonces solo iría la validación del jwt para demostrar
+que somos un usuario autenticado
 
 
 

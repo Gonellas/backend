@@ -30,7 +30,7 @@ const emailExiste = async(correo) => {
 //*Como va a ser una función que va a chequear a la base de datos, va a ser asíncrona
 //*y va a recibir al id
 //?No vamos a usar el findOne porque hay un método exclusivo para buscar ids
-const usuarioExiste = async () =>{
+const usuarioExiste = async (id) =>{
 
     //* Entonces creamos una constante que va a almacenar la respuesta de la búsqueda,
     //*llamamos al Usurio y le pasamos como parámetro el id

@@ -113,32 +113,36 @@ const usersDelete = async(req = request, res = response) =>{
 
     const {id} = req.params;
 
+    //*Que obtenga lo que tenemos del usuario autenticado
+    const usuarioAutenticado = req.usuario;
+
     //eliminar registro
-    const usuarioBorrado = await Usuario.findByIdAndDelete(id);
+    // const usuarioBorrado = await Usuario.findByIdAndDelete(id);
 
     //TODO Para cambiar estado a false
     //*vamos a crear una constante y vamos a ponerle el await,
     //*llamamos al modelo de Usuario junto con el método findById()
     //? es decir que busque un usuario por el id
-    // const usuario = await Usuario.findById(id);
+    const usuario = await Usuario.findById(id);
 
     //*Si yo tengo un usuario por el id y el estado está en falso,
     //* que nos retorne un mensaje json
-    // if(!usuario.estado){
-    //     return res.json({
-    //         msg: "El usuario ya está inactivo"
-    //     });
-    // }
+    if(!usuario.estado){
+        return res.json({
+            msg: "El usuario ya está inactivo"
+        });
+    }
 
     //*Para desactivar al usuario, creamos la variable, le pasamos el modelo
     //*junto al método para que encuentre el id y lo actualice.
     //* Le pasamos el id del usuario y el estado para que cambie
-    // const usuarioInactivado = await Usuario.findByIdAndUpdate(id,{estado:false}, {new:true});
+    const usuarioInactivado = await Usuario.findByIdAndUpdate(id,{estado:false}, {new:true});
 
     res.json({
         message: "Usuario Inactivo",
-        usuarioBorrado
-        // usuarioInactivado
+        // usuarioBorrado
+        usuarioInactivado,
+        usuarioAutenticado
         })
 }
 

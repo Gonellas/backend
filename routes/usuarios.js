@@ -1,5 +1,6 @@
 const {Router} = require ('express');
 const {check} = require('express-validator');
+const Usuario = require('../models/usuarios');
 const { validarCampos } = require('../middlewares/validar_campos');
 
 //en vez de usar app ahora usamos router
@@ -7,6 +8,8 @@ const router = Router();
 
 const {usersGet, usersPost, usersPut, usersDelete} = require('../controllers/usuariosControllers');
 const { esRolValido, emailExiste, usuarioExiste } = require('../helpers/db-validators');
+const { validarJWT } = require('../middlewares/validar-jwt');
+const { esAdminRol } = require('../middlewares/validar-roles');
 
 //la peticion get es cuando desde el back le pedimos info al front
 router.get('/', usersGet);
@@ -54,6 +57,8 @@ router.put('/:id', [
 
 //borra info, va con id tambien
 router.delete('/:id',[
+    validarJWT,
+    esAdminRol,
     check("id", "No es un ID válido").isMongoId(),
     check("id").custom(usuarioExiste),
     validarCampos
