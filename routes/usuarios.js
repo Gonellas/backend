@@ -1,6 +1,5 @@
 const {Router} = require ('express');
 const {check} = require('express-validator');
-const Usuario = require('../models/usuarios');
 const { validarCampos } = require('../middlewares/validar_campos');
 
 //en vez de usar app ahora usamos router

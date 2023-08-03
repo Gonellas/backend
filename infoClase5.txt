@@ -1,0 +1,531 @@
+Colecciones nuevas
+
+Una vez que tengamos listo lo de la autenticación de usuarios, vamos a poder
+trabajar en colecciones nuevas.
+
+Nosotros estamos trabajando con una base de datos no relacional, qué significa esto?
+Que ademas de la colección de usuarios que ya tenemos, podemos crear otras, por ejemplo
+de categoría, tenerlas por separado con la de usuarios las cuales no tendrían nada que
+ver una con la otra pero la aplicación va a funcionar igual.
+
+La realidad es que no son totalmente independientes, por ejemplo si creamos una ruta
+de categorías, tendrá para crear una categoría, también queremos que actualice y borre
+categorías. Al mismo tiempo tenemos que traer todas las categorías.
+
+Que relación tendría la colección de categorías con la de usuario? Podemos decirle
+que almacene al usuario que cree, actualice o borre categorías por ejemplo.
+Por lo que si necesitamos que trabajen en conjunto.
+
+Aunque estemos trabajando con una base de datos no relacional no significa que no 
+se relacionen entre si pero también tenemos la libertad de hacer que las colecciones
+no necesiten de otras.
+
+Cuál podría ser un dato que podamos almacenar en categorías y que cuando consultemos
+obtengamos los registros de usuarios?... el id.
+Entonces vamos a tener que buscar la manera de decirle al modelo de categoría que 
+queremos obtener el id del usuario.
+Como ya vimos las estructuras de modelos, no va a ser tan difícil.
+
+
+-----------------
+
+1. CREACIÓN DE MODELO CATEGORÍA 
+
+- En la carpeta MODELS creamos un nuevo arhivo:
+    categoria.js
+
+- Que necesitabamos importar para crear un modelo?...
+Repasemos el modelo de usuario(MODELS/USUARIOS)
+
+- Tenemos que importar el Schema y el model de moongose. Entonces aprovechando que 
+ya lo tenemos en el modelo de usuario, lo copiamos y pegamos así lo llevamos
+a categoría:
+    const {Schema, model} = require('mongoose');
+
+- Volvemos al modelo de usuario, qué paso sigue?.. Tenemos que crear el Schema:
+    const CategoriaSchema = Schema({
+    
+})
+
+- Exportamos: 
+    module.exports = model("Categoria", CategoriaSchema);
+
+- Qué vamos a guardar en Categoría? Va a tener:
+    1. un nombre
+    2. un estado
+    3. y le vamos a agregar el dato con el que vamos a conectarnos al modelo de 
+    usuario, así que vamos a llamarle usuario a este campo
+
+- Entonces definimos: 
+    const CategoriaSchema = Schema({
+
+    //*Va a ser de tipo string y va a ser el único campo obligatorio
+    //*que vamos a tener y si queremos que este campo sea único, es
+    //*decir que no se pueda repetir el nombre le vamos a agregar el
+    //*unique
+        nombre:{
+            type: String,
+            required:[true,"El nombre es obligatorio"],
+            unique:true
+        },
+
+    //*El estado va a ser de tipo boolean, tiene que pasar por el requerido
+    //*pero le podemos poner que por defecto sea true aunque no lo mandemos
+        estado:{
+            type: Boolean,
+            required:true,
+            default: true
+        },
+
+    //*en este usuario quremos almacenar el id que venga del modelo de usuario
+    //*tenemos que agregar un type nuevo que va a ser el id del objeto(object id)
+    //*a este object id le tenemos que decir que va a venir de un Schema
+    //?Entonces este usuario va a ser de tipo object id que viene de un Schema
+    //*Para decirle de que modelo viene vamos a usar la propiedad ref, entre ""
+    //*le decimos a que modelo queremos hacer referencia
+    //*y le decimos que es requerido, que si o si tenemos que guardarlo
+        usuario:{
+            type: Schema.Types.ObjectId,
+            ref:"Usuario",
+            required: true
+        }
+})
+
+- Ya tenemos nuestro modelo de Categoría. Ahora o armamos la ruta o primero el controlador.
+Pero no nos olvidemos que para hacer la ruta, a dónde tenemos que agregarla?... al 
+modelo del server, entonces antes de olvidarnos, la agreguemos
+
+- Vamos MODELS/SERVER y agregamos:
+    this.categoriasPath = "/api/categorias";
+
+- Y también teníamos que agregarla en la función de routes:
+    this.app.use(this.categoriasPath, require("../routes/categorias"));
+
+
+-----------------------
+
+2. CREACIÓN RUTA CATEGORÍAS
+
+- Ya definidas la ruta en el server, creemos nuestra ruta de categorias.
+En la carpeta ROUTES creamos el archivo:
+    categorias.js
+
+- Nuevamente podemos tomar como base las rutas que tenemos como usuario.
+Vamos a ROUTES/USUARIOS y vemos que tenemos que importar el Router:
+    const {Router} = require ('express');
+
+- También tenemos el check de express-validator para validar las rutas:
+    const {check} = require('express-validator');
+
+- También tenemos nuestro middleware customizado validarCampos, que almacenaba 
+los errores de los check para mostrarlos si es que existieran:
+    const { validarCampos } = require('../middlewares/validar_campos');
+
+- A continuación vemos que tenemos los controladores que todavía no creamos
+así que todavía no los vamos a agregar
+
+- Luego vemos que en los helpers importabamos nuestros validators que eran 
+si esRolValido, emailExiste y usuarioExiste pero a estos no los vamos a necesitar,
+los que si vamos a necesitar si vemos en nuestra carpeta de middlewares, es validar el jwt
+y validar rol que validaba si era admin.
+
+- Entonces importamos estos middlewares para tenerlos ya listos:
+    const {validarJWT} = require('../middlewares/validar-jwt');
+    const {esAdminRol} = require('../middlewares/validar-roles');
+
+- Si volvemos a ROUTES/USUARIOS lo que seguía era crearnos la variable router:
+    const router = Router();
+
+- Ahora creemos las peticiones:
+    //*Cuando usemos el get que se dispare la función obtenerCategorias
+    //*y nos traiga todas las categorías
+        router.get('/', obtenerCategorias);
+
+    //*y si queremos traer a una categoría por su id, tendríamos que pasarle
+    //*el id a la ruta y le cambiamos el nombre al controlador por el singular
+        router.get('/:id', obtenerCategoria);
+
+    //*la petición post para crear una categoría
+        router.post('/', crearCategoría);
+
+    //*la petición put para actualizar una categoría y le mandamos el id
+    //*como parámetro
+        router.post('/:id', actualizarCategoría);
+
+    //*finalmente tendríamos el delete a quien también le pasamos el id
+        router.delete('/:id', borrarCategoria);
+
+- Una vez definidas las rutas, exportamos:
+    module.exports = router;
+
+- Ahora, nosotros como usuarios comunes, deberíamos ver las categorías?... si
+entonces no nos hace falta validar si es admin rol pero si estaría bueno
+la validación del jwt porque capaz queremos que puedan ver esas categorías quienes
+estén loggeados solamente, pero si no nos molesta si está loggeado o no, no
+agregaríamos esta validación:
+    router.get('/', [validarJWT], obtenerCategorias);
+
+- En el caso del id para buscar la categoría, si vamos a tener que validar que el id
+sea válido:
+    router.get('/:id',[
+        check("id", "No es un ID válido").isMongoId,
+    ], obtenerCategoria);
+
+- Pero también vamos a querer que esté validado el JWT al principio:
+    router.get('/:id',[
+        validarJWT,
+        check("id", "No es un ID válido").isMongoId(),
+    ], obtenerCategoria);
+
+- Ahora suponiendo que el id es válido pero no existe ninguna categoría con ese id
+vamos a tener que hacer algo también que ya lo vamos a ver:
+    router.get('/:id',[
+        validarJWT,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+    ], obtenerCategoria);
+
+- Y para tomar los errores no nos tiene que faltar el validarCampos:
+    router.get('/:id',[
+        validarJWT,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+        validarCampos
+    ], obtenerCategoria);
+
+- La petición post suele ser la más complicada pero en el caso de las categorías
+vamos a poner que solamente el admin pueda agregarlas pero primero validamos que el
+admin este autenticado:
+    router.post('/', [
+        validarJWT,
+    ], crearCategoría);
+
+- Luego validamos si es admin rol:
+    router.post('/', [
+        validarJWT,
+        esAdminRol,
+    ], crearCategoría);
+
+- Había un campo que habíamos dicho en el modelo de categorías que tenía que 
+ser obligatorio, cuál era?... el nombre y luego agregamos el validarCampos:
+    router.post('/', [
+        validarJWT,
+        esAdminRol,
+        check("nombre", "El nombre es obligatorio").notEmpty(),
+        validarCampos
+    ], crearCategoría);
+
+- Ahora en el put, nuevamente para poder actualizar una categoría, 
+tenemos que estar loggeados:
+    router.post('/:id', [
+        validarJWT
+    ], actualizarCategoría)
+
+- Luego, tenemos que ser administradores:
+    router.post('/:id', [
+        validarJWT,
+        esAdminRol
+    ], actualizarCategoría);
+
+- También como estamos utilizando el id, tenemos que checkear que sea válido:
+    router.post('/:id', [
+        validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+    ], actualizarCategoría);
+
+- Y también queremos verificar que exista la categoría con el id:
+    router.post('/:id', [
+        validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+    ], actualizarCategoría);
+
+- Lo único que tenemos para actualizar de la categoría que es?... el nombre,
+entonces también vamos a necesitar validarlo:
+    router.post('/:id', [
+        validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+        check("nombre", "El nombre es obligatorio").notEmpty(),
+        validarCampos
+    ], actualizarCategoría);
+
+- Finalmente, vamos a validar los campos:
+    router.post('/:id', [
+       validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+        check("nombre", "El nombre es obligatorio").notEmpty(),        
+        validarCampos
+    ], actualizarCategoría);
+
+- Si ustedes no le pusieran un valor por defecto al estado, si tendrían que
+validarlo también porque sino devolvería como undefined pero como le pusimos el 
+default en true no lo vamos a necesitar en este caso.
+
+- En el caso del delete, sería casi exactamente lo mismo pero no validaríamos el
+nombre, entonces copiemos y pegamos lo que tenemos en el put:
+    router.delete('/:id', [
+        validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+        //validar si existe una categoría con ese id,
+        validarCampos
+    ], borrarCategoria);
+
+
+------------------
+
+3. CONTROLADORES CATEGORÍAS 
+
+- Una vez listas las rutas, tenemos que pasar a crear los controladores.
+Si bien los definimos en las rutas, todavía no tienen ningun funcionamiento.
+Vamos a la carpeta controllers y creamos el archivo:
+    categorias.js
+
+- Si vamos al controlador de usuarios, veamos que fue lo que hicimos.
+Habíamos importado la response y request de express, el bcrypt no lo vamos a necesitar
+porque es para encriptar las contraseñas y también habíamos llamado al modelo de Usuario
+que en este caso tendríamos que llamar al de Categoria
+
+- Copiamos las importaciones:
+    const {response, request} = require('express');
+    const Categoria = require('../models/categoria');
+
+- El primer controlador que vamos a crear va a ser el de obtenerCategorias: 
+    //*creamos la variable, va a ser una función que va a recibir la res y la req
+    const obtenerCategorias = (req = request, res = response) =>{
+    
+    }
+
+- Y exportamos: 
+    module.exports = {
+        obtenerCategorias,
+    }
+
+- En este controlador vamos a querer obtener todas las categorías paginadas con el total.
+Esto es muy parecido a lo que hicimos en el controlador de Usuarios:
+obteníamos de la query lo que mandábamos como consulta en Postman:
+    const {desde, limite} = req.query;
+
+- Vamos a POSTMAN y creamos una nueva petición get. Le pasamos la ruta:
+    http://localhost:3050/api/categorias
+
+- Nosotros vamos a querer que en esa sea nuestra ruta, acuerdensé que como query
+pasabamos el límite y el desde
+
+- Ahora por que poníamos esta línea de código?... porque queríamos que solo nos traiga
+los usuarios que estaban activos:
+    const query = {estado:true};
+
+- Estas dos líneas de código las vamos a copiar y pegar en nuestro controlador de obtenerCategorías:
+    //Obtener todas las categorías paginadas con el total
+    //*queremos obtener la query de "desde" y "límite" para paginarlas porque capaz
+    //*tenemos un montón de categorías y también queremos que nos muestre solo las categorías
+    //*que están activas
+        const {desde, limite} = req.query;
+        const query = {estado:true};
+
+- Luego si volvemos al controlador de usuario teníamos una promesa que nos hacía ganar velocidad
+en la petición. Esto también lo podemos hacer en Categorias, entonces lo llevamos y reemplazamos:
+    //*countDocuments contaba contaba la cantidad de documentos que tenemos en la colección
+    //*find buscaba las colecciones que tengan el registro en true porque le pasamos la query
+    //*con el skip le decíamos desde donde y con el limit la cantidad de documentos que queremos traer
+        const [total, categorias] = await Promise.all([
+            Categoria.countDocuments(query),
+            Categoria.find(query).skip(desde).limit(limite)
+        ])
+
+- Finalmente devolvemos en un json el total y categorias:
+    res.json({
+        total,
+        categorias
+    })
+
+- No nos olvidemos de importar el controlador en la ruta:
+    const { obtenerCategorias } = require('../controllers/categorias');
+
+- Probamos en POSTMAN y nos devuelve que no hay token en la petición, lo cual está perfecto
+porque la validación que le pusimos era que valide el token
+
+- Ahora vamos a la petición login, nos loggeamos, copiamos el token y volvemos al get categorias
+
+- Donde tengo que pasar el token?... en Headers:
+    1. Como key poníamos x-token y en value el token
+    2. Nos devuelve el listado de categorías y el total que en este caso tenemos 0 porque todavía 
+    no las creamos
+
+- Ahora vamos a pasar al siguiente controlador que es obtenerCategoria:
+    //*creamos la variable, va a ser una función que va a recibir la res y la req
+    //*y también vamos a decir que es una función asíncrona
+        const obtenerCategoria = (req = request, res = response) =>{
+        }
+
+- Exportamos: 
+    module.exports = {
+        obtenerCategorias,
+        obtenerCategoria
+    }
+
+- Necesitamos obtener el id que nos va a mandar el frontend. En Postman tendríamos una ruta:
+    localhost:8080/api/categorias/id
+
+- Tendríamos que obtener el id de los params. Volvemos a CONTROLLERS/CATEGORIAS:
+    //*vamos a desestructurar el id que viene de la req.params
+        const {id} = req.params;
+
+- Ahora tenemos que buscar una categoría que coincida con ese id.
+
+- Como nosotros ya validamos que el formato coincida, lo único que nos faltaría sería
+validar si existe la categoría que tenga ese id que ya lo vamos a hacer, pero suponiendo
+que ya lo tenemos vamos a crear una constante:     
+    //*vamos a crear una constante categoria, vamos a esperar, llamamos al modelo de Categoria
+    //*y utilizamos el metodo findById pasándole el id
+        const categoria = await Categoria.findById(id)
+
+- Lo único que nos faltaría hacer sería que nos devuelva una respuesta, entonces:
+    //*le mandamos la categoria que encontramos
+        res.json({
+            categoria
+        })
+
+- Ahora para poder usarla nos quedaría importarla en las rutas: 
+    const { obtenerCategorias, obtenerCategoria } = require('../controllers/categorias');
+
+- Vamos a probarla en POSTMAN:
+    1. Como primer paso corroboramos la ruta:
+        localhost:3050/api/categorias/id
+    2. Segundo que necesitamos?... un id:
+        le pasamos un id de alguna categoria creada
+    3. Le pasamos el token creado anteriormente o creamos otro en el login
+
+- Esto nos devuelvo un json con los datos categoría, si ven, nos trae el id,
+el nombre, el estado y en el usuario nos devuelve el id nuevamente.
+Yo no quiero que me devuelva el id, yo quiero que me devuelva el mail de la 
+perosona que realizó esta acción.
+
+- Vamos a CONTROLLERS/CATEGORIAS
+
+- Entonces, el mismo lugar donde le pedimos que busque la categoría por el id,
+le podemos agregar un método: 
+    //?el método populate recibe cual es el campo donde se encuentra el id, que lo habíamos
+    //?definido en usuario en el modelo de categoria, le pasamos usuario entre "",
+    //?el segundo parámetro son los datos que queremos traer con el id que tenemos
+    //!para pasarle esto tiene que ser entre comillas y separado por un espacio
+        const categoria = await Categoria.findById(id).populate("usuario", "nombre correo");
+
+- Probamos en Postman nuevamente. Nos debería traer ahora el campo usuario con
+los datos que le pasamos nombre, corre y su uid
+
+- De esta manera podemos hacer una conexión entre dos colecciones, en nuestro caso 
+categoría y usuario
+
+- Ahora vamos a pasar al método post y empezar con la integración del frontend.
+Entonces en el controller de categoria creamos la variable:
+    //*creamos la variable, al igual que las demas peticiones va a ser asíncrona
+    //*también vamos a recibir la req y res
+        const crearCategoría = async (req = request, res = response) =>{
+
+    }
+
+- Lo primero que vamos a necesitar para crear una categoría va a ser
+recibir el nombre. Vamos a POSTMAN, creamos la petición post y nuestra ruta tendría
+que ser:
+    localhost:3050/api/categorias
+
+- En el body(raw, json), lo único que necesitamos mandarle es el nombre para crear la categoria:
+    {
+        "nombre": "Análisis de datos"
+    }
+
+- El nombre es lo único que necesitamos porque el estado por defecto lo pasamos como true
+y el id del usuario no lo va a mandar el frontend porque ese id va a ser del usuario que 
+se autenticó, o sea el usuario que se loggeó
+
+- Entonces, como el nombre viene del body (VAMOS A CONTROLLERS/CATEGORIAS):
+    //*creamos la variable que va a ser igual a la req.body.nombre
+        const nombre = req.body.nombre;
+
+- Ahora por una cuestión de estandarizar, vamos a ponerle el método para
+que nos devuelva el nombre con mayúscula porque capaz que alguien carga el 
+dato escrito de cualquier forma.
+Cuál era el método que nos transformaba en mayúscula un string?... toUpperCase():
+    const nombre = req.body.nombre.toUpperCase();
+
+- Esto solo sería para guardar en el back, en el front que lo guarden como
+quieran.
+
+- Como el nombre era un dato único no podríamos tener dos categorías con el
+mismo nombre, entonces el próximo paso que sigue es verificar eso:
+    //Verificar si la categoría ya existe
+    //*vamos a crear una categoríaDB y simplemente vamos a hacer un consulta
+    //*que busque esa categoría con ese nombre que se va a almacenar en
+    //*categoriaDB
+        const categoriaDB = await Categoria.findOne({nombre});
+
+    //*entonces preguntamos si categoriaDB existe porque no es undifined
+    //*le pasamos una respuesta con un error 400 porque viene de parte del
+    //*usuario
+        if(categoriaDB){
+            res.status(400).json({
+                msg:`La categoría ${categoriaDB.nombre} ya existe`
+            })
+        }
+
+- Si no encuentra nada, esto no se va a ejecutar porque quiere decir que
+el nombre no esta repetido. Entonces ahora tenemos que generar la data
+que vamos a guardar:
+    //generar data que vamos a guardar
+    //*podemos crear un objeto que se llame data, este objeto data va a tener
+    //*nombre, y luego vamos a almacenar usuario que nos traiga el id de la req
+    //?la req viene de la validación de jwt que le pasamos el dato del usuario
+    //?autenticado
+        const data ={
+            nombre,
+            usuario: req.usuario._id
+        }
+
+- Una vez que tenemos la data tenemos que crearnos la categoria que nos
+traiga esta data:
+    //*creamos la variable categorias que sea igual a new Categoría, es decir
+    //*que depende de nuestro modelo y le mandamos la data
+        const categoria = new Categoria(data);
+
+    //*para guardarlo solo tenemos que hacer el await, llamamos a categoria
+    //*con su método save
+        await categoria.save();
+
+- Ahora solo nos faltaría devolver una respuesta que le podemos mandar
+un status de registro:
+    //*respuesta con status de registro exitoso que devuelva categoria
+    //*y un msg
+        res.status(201).json({
+            categoria,
+            msg:'Categorpia creada exitosamente'
+        })
+
+- Eso es todo para crear una categoría. Nos faltaría exportarlo:
+    module.exports = {
+        obtenerCategorias,
+        obtenerCategoria,
+    crearCategoría
+}
+
+- Y lo importamos en la ruta(ROUTES/CATEGORIAS):
+    const { obtenerCategorias, obtenerCategoria, crearCategoria } = require('../controllers/categorias');
+
+- Probamos en POSTMAN:
+    {
+        "nombre": "Analisis de datos"
+    }
+
+- Nos pide un token porque lo tiene que hacer el usuario loggeado.
+Entonces copiamos un token de la petición anterior que creamos y le pasamos
+por el Headers y probamos nuevamente.
+
+- Entonces ahora si volvemos a la petición GET que nos trae todas las categorías y 
+y le damos send, nos trae esta nueva que creamos
