@@ -16,7 +16,7 @@ const obtenerCategorias = async (req = request, res = response) =>{
     //*con el skip le decíamos desde donde y con el limit la cantidad de documentos que queremos traer
     const [total, categorias] = await Promise.all([
         Categoria.countDocuments(query),
-        Categoria.find(query).skip(desde).limit(limite)
+        Categoria.find(query).skip(desde).limit(limite).populate("usuario","correo")
     ])
 
     res.json({
@@ -94,8 +94,48 @@ const crearCategoria = async (req = request, res = response) =>{
     })
 }
 
+const actualizarCategoria = async(req = request, res = response) =>{
+    //Obtenemos id
+    const {id} = req.params;
+
+    //Obtenemos el nombre
+    const nombre = req.body.nombre.toUpperCase();
+
+    //Obtenemos el usuario
+    const usuario = req.usuario._id
+
+    //Generar la data
+    const data = {
+        nombre,
+        usuario
+    }
+
+    //Guardar la data
+    const categoria = await Categoria.findByIdAndUpdate(id, data, {new:true})
+
+    res.status(201).json({
+        categoria,
+        msg:'Categoría actualizada'
+    })
+}
+
+const borrarCategoria = async (req = request, res = response) =>{
+
+    //Obtener id
+    const {id} = req.params;
+
+    const categoriaBorrada = await Categoria.findByIdAndUpdate(id, {estado:false}, {new:true});
+
+    res.json({
+        categoriaBorrada,
+        msg:'Categoría inactivada'
+    })
+}
+
 module.exports = {
     obtenerCategorias,
     obtenerCategoria,
-    crearCategoria
+    crearCategoria,
+    actualizarCategoria,
+    borrarCategoria
 }

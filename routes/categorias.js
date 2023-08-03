@@ -3,7 +3,7 @@ const {check} = require('express-validator');
 const { validarCampos } = require('../middlewares/validar_campos');
 const {validarJWT} = require('../middlewares/validar-jwt');
 const {esAdminRol} = require('../middlewares/validar-roles');
-const { obtenerCategorias, obtenerCategoria, crearCategoria } = require('../controllers/categorias');
+const { obtenerCategorias, obtenerCategoria, crearCategoria, actualizarCategoria, borrarCategoria } = require('../controllers/categorias');
 
 const router = Router();
 
@@ -28,24 +28,24 @@ router.post('/', [
     validarCampos
 ], crearCategoria);
 
-// //*la petición put para actualizar una categoría y le mandamos el id
-// //*como parámetro
-// router.post('/:id', [
-//     validarJWT,
-//     esAdminRol,
-//     check("id", "No es un ID válido").isMongoId(),
-//     //validar si existe una categoría con ese id,
-//     check("nombre", "El nombre es obligatorio").notEmpty(),
-//     validarCampos
-// ], actualizarCategoría);
+//*la petición put para actualizar una categoría y le mandamos el id
+//*como parámetro
+router.put('/:id', [
+    validarJWT,
+    esAdminRol,
+    check("id", "No es un ID válido").isMongoId(),
+    //validar si existe una categoría con ese id,
+    check("nombre", "El nombre es obligatorio").notEmpty(),
+    validarCampos
+], actualizarCategoria);
 
-// //*finalmente tendríamos el delete a quien también le pasamos el id
-// router.delete('/:id', [
-//     validarJWT,
-//     esAdminRol,
-//     check("id", "No es un ID válido").isMongoId(),
-//     //validar si existe una categoría con ese id,
-//     validarCampos
-// ], borrarCategoria);
+//*finalmente tendríamos el delete a quien también le pasamos el id
+router.delete('/:id', [
+    validarJWT,
+    esAdminRol,
+    check("id", "No es un ID válido").isMongoId(),
+    //validar si existe una categoría con ese id,
+    validarCampos
+], borrarCategoria);
 
 module.exports = router;

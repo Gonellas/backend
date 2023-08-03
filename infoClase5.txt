@@ -528,4 +528,130 @@ Entonces copiamos un token de la petición anterior que creamos y le pasamos
 por el Headers y probamos nuevamente.
 
 - Entonces ahora si volvemos a la petición GET que nos trae todas las categorías y 
-y le damos send, nos trae esta nueva que creamos
+y le damos send, nos trae esta nueva que creamos pero también queremos que nos traiga 
+datos del usuario.
+
+- Si volvemos al controlador del get, el primero que hicimos, donde traemos todas
+las categorías desde y hasta cierto límite, también podemos agregar el populate:
+    Categoria.find(query).skip(desde).limit(limite).populate("usuario","correo")
+
+- En este caso solo le vamos a pedir que nos traiga el correo
+
+- Probamos de nuevo en Postman
+
+- Ahora que pasa si queremos crear una categoría con un usuario que no es admin?
+Probamos en Postman, nos logueamos con test3, sacamos el token y le pasamos al post
+Nos va a salir que no es admin, esto quiere decir que las validaciones están funcionando 
+
+- Ahora probemos qué pasa si queremos cargar un curso que ya existe.
+En el post con el token de test1, probamos post el curso informática.
+Nos sale que ya existe
+
+------------
+
+- Vamos a crear el controlador del put:
+    const actualizarCategoría = async(req = request, res = response) =>{
+
+    }
+
+- En el caso del put nosotros necesitamos obtener el id. En obtenerCategoria ya lo
+hicimos entonces simplemente vamos a copiar y pegar:
+    //Obtenemos id
+    const {id} = req.params;
+
+- Vamos a tener dos cosas que probablemente queramos actualizar: el nombre y 
+también estaría bueno guardar el id del usuario que lo está actualizando ante 
+cualquier problema que tengamos
+
+- Entonces, así como hicimos en el post vamos a obtener el nombre:
+    const nombre = req.body.nombre.toUpperCase();
+
+- Y nos faltaría el usuario:
+    //Obtenemos el usuario
+    const usuario = req.usuario._id
+
+- Ahora necesitamos generar la data. creando el objeto como hicimos anteriormente:
+    //Generar la data
+    const data = {
+        nombre,
+        usuario
+    }
+
+- Para guardarlo vamos a hacer algo parecido al save, pero lo vamos a buscar
+por el id y guardarlo:
+    //Guardar la data
+    const categoria = await Categoria.findByIdAndUpdate(id, data, {new:true})
+
+- Para la respuesta le vamos a mandar el 201 también como actualización exitosa:
+    res.status(201).json({
+        categoria,
+        msg:'Categoría actualizada'
+    })
+
+- Exportamos: 
+    module.exports = {
+        obtenerCategorias,
+        obtenerCategoria,
+        crearCategoria,
+        actualizarCategoría
+    }
+
+- E importamos en la ruta:
+    const { obtenerCategorias, obtenerCategoria, crearCategoria, actualizarCategoria } = require('../controllers/categorias');
+
+- Probamos en POSTMAN, creamos la petición PUT, le pasamos la ruta:
+    localhost:3050/api/categorias/id
+
+- Buscamos el id de una categoría creada y el body debería tener los cambios que
+quiero guardar:
+    {
+        "nombre":"matemáticas"
+    }
+
+- Y de nuevo, nos sale que no tiene el token porque en las validaciones le habíamos
+pasado que si no estaba loggeado y no tenía el token, no se pueda actualizar.
+
+- Le pasamos el token y le damos el send. Nos debería salir la categoria actualizada.
+
+- Si vamos al get de obtenerCategorias, ya no nos saldría el curso de Analisis de datos, sino 
+de Matemáticas. PROBAMOS EN POSTMAN
+
+-----------
+
+- Ahora pasemos a nuestro último controlador, el delete:
+    const borrarCategoria = async (req = request, res = response) =>{
+
+    }   
+
+- Al igual que hicimos en el put, tenemos que obtener el id:
+    const {id} = req.params;
+
+- Luego vamos a crear una variable que llame al modelo y que busque por id y actualice,
+le vamos a pasar por parámetros el id, que queremos que actualice el estado a false,
+y el new:true para que nos devuelva la info actualizada:
+    const categoriaBorrada = await Categoria.findByIdAndUpdate(id, {estado:false}, {new:true})
+
+- Por último en la respuesta le mandamos la categoría borrada y un mensaje:
+    res.json({
+        categoriaBorrada,
+        msg:'Categoría inactivada'
+    })
+
+- Exportamos:   
+    module.exports = {
+        obtenerCategorias,
+        obtenerCategoria,
+        crearCategoria,
+        actualizarCategoria,
+        borrarCategoria
+    }
+
+- E importamos en las rutas:
+    const { obtenerCategorias, obtenerCategoria, crearCategoria, actualizarCategoria, borrarCategoria } = require('../controllers/categorias');
+
+- Probamos en POSTMAN creando una nueva petición con la ruta de la categoría
+que habíamos actualizado
+
+- No nos olvidemos de poner el token antes y probamos. Nos sale que se inactivó.
+
+- Si vamos al GET nuevamente y le damos send, ya no nos traería esa categoría.
