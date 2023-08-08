@@ -4,6 +4,7 @@ const { validarCampos } = require('../middlewares/validar_campos');
 const {validarJWT} = require('../middlewares/validar-jwt');
 const {esAdminRol} = require('../middlewares/validar-roles');
 const { obtenerCategorias, obtenerCategoria, crearCategoria, actualizarCategoria, borrarCategoria } = require('../controllers/categorias');
+const { categoriaExiste } = require('../helpers/db-validators');
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.get('/:id',[
     validarJWT,
     check("id", "No es un ID válido").isMongoId(),
     //validar si existe una categoría con ese id,
+    check('id').custom(categoriaExiste),
     validarCampos
 ], obtenerCategoria);
 
@@ -35,6 +37,7 @@ router.put('/:id', [
     esAdminRol,
     check("id", "No es un ID válido").isMongoId(),
     //validar si existe una categoría con ese id,
+    check('id').custom(categoriaExiste),
     check("nombre", "El nombre es obligatorio").notEmpty(),
     validarCampos
 ], actualizarCategoria);
@@ -45,6 +48,7 @@ router.delete('/:id', [
     esAdminRol,
     check("id", "No es un ID válido").isMongoId(),
     //validar si existe una categoría con ese id,
+    check('id').custom(categoriaExiste),
     validarCampos
 ], borrarCategoria);
 

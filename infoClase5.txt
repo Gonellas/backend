@@ -150,7 +150,7 @@ y validar rol que validaba si era admin.
 
     //*la petición put para actualizar una categoría y le mandamos el id
     //*como parámetro
-        router.post('/:id', actualizarCategoría);
+        router.put('/:id', actualizarCategoría);
 
     //*finalmente tendríamos el delete a quien también le pasamos el id
         router.delete('/:id', borrarCategoria);

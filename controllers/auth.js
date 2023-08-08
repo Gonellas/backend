@@ -72,9 +72,6 @@ const login = async (req = request, res = response) => {
             msg: "Hable con el administrador"
         })
     }
-
-
-
 }
 
 

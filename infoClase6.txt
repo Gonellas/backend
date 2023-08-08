@@ -1,0 +1,388 @@
+Una de las cosas que nos faltó hacer es validar si existe una categoría
+con ese id, porque si buscaramos una categoría con un id inexsitente se 
+nos rompería todo.
+
+Lo vamos a hacer de la misma forma que validamos el usuario, vamos a HELPERS/DB-VALIDATORS 
+
+- Así como hicimos la validación de si el usuario existe, vamos a copiar ese código:
+    const usuarioExiste = async (id) =>{
+        const existeUsuario = await Usuario.findById(id);
+
+        if(!existeUsuario) throw new Error(`El id ${id} no corresponde a ningún usuario registrado`);
+    }
+
+- y lo cambiaríamos: 
+    const categoriaExiste = async (id) =>{
+        const existeCategoria = await Usuario.findById(id);
+
+        if(!existeCategoria) throw new Error(`El id ${id} no corresponde a ningún usuario registrado`);
+    }
+
+- Como tenemos que hacer una búsqueda por el modelo de categoría para buscar el id
+tenemos que importarlo:
+    const Categoria = require('../models/categoria');
+
+- Y le pasamos el modelo de Categoria:
+    const categoriaExiste = async (id) =>{
+
+        //*Si no encuentra nada nos va a devolver un undefined
+        const existeCategoria = await Categoria.findById(id);
+
+        //*Entonces si no existe tal id, le pasamos el error
+        if(!existeCategoria) throw new Error(`El id ${id} no corresponde a ninguna categoría registrada`);
+    }
+
+- Por último exportamos la función: 
+    module.exports = {
+        esRolValido,
+        emailExiste,
+        usuarioExiste,
+        categoriaExiste
+    }
+
+- Vamos a volver a las rutas(ROUTES/CATEGORIAS) y en el get de obtenerCategoria
+vamos a llamar a un check customizado:
+    router.get('/:id',[
+        validarJWT,
+        check("id", "No es un ID válido").isMongoId(),
+        
+        //validar si existe una categoría con ese id,
+        check('id').custom(categoriaExiste),
+
+        validarCampos
+    ], obtenerCategoria);
+
+- Chequeamos que se haya importado: 
+    const { categoriaExiste } = require('../helpers/db-validators');
+
+- Y ahora podemos agregarla también al put y al delete: 
+    router.put('/:id', [
+        validarJWT,
+        esAdminRol,
+        check("id", "No es un ID válido").isMongoId(),
+
+        //validar si existe una categoría con ese id,
+        check('id').custom(categoriaExiste),
+
+        check("nombre", "El nombre es obligatorio").notEmpty(),
+        validarCampos
+    ], actualizarCategoria);
+
+    router.delete('/:id', [
+            validarJWT,
+            esAdminRol,
+            check("id", "No es un ID válido").isMongoId(),
+
+            //validar si existe una categoría con ese id,
+            check('id').custom(categoriaExiste),
+
+            validarCampos
+        ], borrarCategoria);
+
+
+-------------------
+
+MODELO DE CURSOS
+
+- Explico ruta, controladores y modelo de CURSOS, no olvidar exportar en server
+
+- Probamos en POSTMAN:
+
+    1. Petición GET Cursos que nos envía los cursos y el total
+    2. Petición GET Curso con el ID
+    3. Petición POST Curso:
+        {
+            "nombre":"Testing",
+            "categoria": "64cb03ad2e2182f4615f9968",
+            "descripcion": "Aprende desde cero a testear tus aplicaciones",
+            "img": "data:image/png;base64,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",
+            "precio": 5000
+        }
+    4. Petición PUT:
+        Cambio imagen o nombre
+    5. Petición DELETE
+
+
+---------------
+
+BUSCADOR 
+
+- Vamos a hacer un buscador para nuestro backend, la idea sería que nuestra ruta
+sea algo así:
+
+- Vamos a POSTMAN, abrimos petición nueva y ponemos:
+    {{url}}/api/buscar/cursos/java
+
+- Después del buscador iría el nombre de la colección y seguido de qué queremos buscar
+Sería como el buscador que aparece en las páginas, si coincide con algo nos tendríamos
+que aparecer
+
+- Vamos a crear una ruta nueva. Vamos a la carpeta ROUTES y añadimos el archivo:
+    buscar.js
+
+- Como toda ruta vamos a tener el router:
+    const {Router} = require ('express');
+
+- Vamos a tener también la variable router:
+    const router = Router();
+
+- Y vamos a exportarlo:   
+    module.exports = router;
+
+- Y vamos a crear una petición get porque estamos pidiendo información:
+    router.get('/')
+
+- Esta ruta va a llevar dos parámetros:
+    router.get('/:coleccion/:termino')
+
+- Y luego vamos a llamar al controlador:
+    router.get('/:coleccion/:termino', buscar);
+
+- Ahora trabajemos en el controlador. Vamos a carpeta CONTROLLERS y agregamos 
+el archivo:
+    buscar.js
+
+- Este controlador tiene cosas parecidas a los demás, por ej, vamos a importar
+el response y request:
+    const { response, request } = require('express');
+
+- Como vamos a tener que buscar en las tres colecciones, vamos a tener que importar
+los modelos: 
+    const Usuario = require('../models/usuarios');
+    const Categoria = require('../models/categoria');
+    const Curso = require('../models/curso');
+
+- Ahora vamos a definir cuáles son las calecciones permitidas porque capaz
+que nos mandan otra cosa nada que ver entonces para adelantarnos vamos a 
+crearnos un arreglo: 
+    //Definimos colecciones permitidas
+        const coleccionesPermitidas = [
+            'usuarios',
+            'categorias',
+            'cursos'
+        ]
+
+- Ahora si vamos a trabajar en la función principal de búsqueda,
+no va a ser la única que tengamos, ya lo vamos a ver:
+    //Función principal de búsqueda
+        const buscar = (req = request, res = response) =>{
+
+        }
+
+- Y exportamos: 
+    module.exports = {
+        buscar
+    }
+
+- Si revisamos la ruta nuevamente, los datos que tenemos que obtener son
+la colección y el término. Entonces vamos a obtenerlos de:
+    req.params
+
+- Como sigue esto? vamos a desestructurar colección y término:
+    const buscar = (req = request, res = response) =>{
+
+        const {coleccion, termino} = req.params;
+
+    }
+
+- Ahora vamos a validar la colección:
+    //Validar colección
+    //*Si esta colección no está incluida en las colecciones permitidas
+    //*Le vamos a devolver un status 400 porque el usuario está mandando
+    //*algo que no era
+        if(!coleccionesPermitidas.includes(coleccion)){
+            return res.status(400).json({
+                msg:`Las colecciones permitidas son: ${coleccionesPermitidas}`
+            })
+        }
+
+- Si la colección es correcta lo que vamos a hacer es, de acuerdo
+a la colección buscar por el término:
+    //De acuerdo a la colección buscar por el término
+    //*Simplemente vamos a usar un switch, lo que vamos a chequear es
+    //*la colección, entonces por ej si la colección es usuarios, voy a ejecutar
+    //*una función que busque en esta colección el término
+    //?Vamos a hacerlo por partes, dejamos definida la función y después la desarrollamos
+    //*Esta función va a llevar dos parámetros: termino y la response porque lo vamos a usar
+    //*para devolver una respuesta si encontramos o no el usuario
+        switch(coleccion){
+            case 'usuarios':
+                buscarUsuarios(termino, res)
+                break;
+                
+        }
+
+- Vamos a hacer lo mismo con categorias y con cursos:
+   switch(coleccion){
+        case 'usuarios':
+            buscarUsuarios(termino, res)
+            break;
+        case 'categorias':
+            buscarCategorias(termino, res)
+            break;  
+        case 'cursos':
+            buscarCursos(termino, res)
+            break;  
+    }
+
+- Y en el default le vamos a mandar un error del servidor:
+    switch(coleccion){
+        case 'usuarios':
+            buscarUsuarios(termino, res)
+            break;
+        case 'categorias':
+            buscarCategorias(termino, res)
+            break;  
+        case 'cursos':
+            buscarCursos(termino, res)
+            break;  
+        default:
+            res.status(500).json({
+                msg: 'Hubo un error al hacer la búsqueda'
+            });
+            break;
+    }
+
+- Nuestra función principal va a ser la que ejecute todo el buscador pero
+nuestras funciones del switch van a ser las otras que tengamos, vamos a
+declararlas antes de nuestra función principal.
+
+- Vamos a crear primero el buscador de usuarios:
+    const buscarUsuarios = () => {
+    
+    }
+
+- Acuerdense que estas funciones recibían el término y la response como 
+parámetros:
+    const buscarUsuarios = (termino, res = response) => {
+
+    }
+
+- Como no sabemos en qué formato nos va a venir el usuario como respuesta,
+vamos a tener que utilizar las expresiones regulares.
+
+- Qué eran las expresiones regulares?.. son términos que sirven para hacer
+búsquedas específicas.
+
+- Yo quiero que nuestro buscador sea insensible a las mayúsculas y minúsculas, 
+para eso vamos a utilizar los modificadores de las expresiones regulares.
+
+Para ello vamos a crear una variable que se llame regex(regular expression):
+    //*Creamos la variable regex y le decimos que sea una nueva RegExp, que
+    //*es una palabra reservada para decirle que regex va a ser una exp reg,
+    //*es como si fuera una instancia.
+    //? va a recibir el término, seguido del modificador "i" que nos dice que sea
+    //?insensible a may o min
+        const regex = new RegExp(termino, "i");
+
+- Como vamos a usar ahora esta expresión regular?
+Vamos a crear una constante:
+    //*creamos la variable, llamamos al modelo de usuario y dentro del find
+    //*podemos buscar por correo o nombre
+        const usuario = await Usuario.find({})
+
+- Hay una propiedad dentro del método find que se escribe con el signo $
+que recibe un arreglo de objetos:
+    const usuario = await Usuario.find({
+        $or: []
+    })
+
+- Dentro de ese arreglo le vamos a pasar las propiedas por las cuales 
+queremos encontrar al usuario con la propiedad regex que acabamos de crear:
+    const usuario = await Usuario.find({
+        $or: [{nombre: regex}, {correo: regex}]
+    })
+
+- Estaría bueno que nos traiga solo los usuarios activos, para ellos le vamos
+a agregar otra propiedad que es el $and:
+    const usuario = await Usuario.find({
+        $or: [{nombre: regex}, {correo: regex}],
+        $and: [{estado:true}]
+    })
+
+- Ahora devolvemos la respuesta: 
+    //*esta búsqueda nos devuelve un array con todos lo usuarios que haya encontrado
+        res.json({
+            results: usuarios
+        })
+
+- Vamos a crear ahora la función para crear categorías:   
+    const buscarCategorias = async(termino, res = response) => {
+    
+    } 
+
+- Vamos a realizar exactamente lo mismo, vamos a crear la función para
+la expresión regular: 
+    const regex = new RegExp(termino, "i");
+    
+- Y vamos a hacer lo que hicimos con usuarios, creamos una constante categorias
+que llame al modelo...: 
+    const categorias = await Categoria.find({
+
+    })
+
+- Como vamos a buscar solo el nombre, no hace falta que agreguemos el $or o $and,
+entonces solo ponemos nombre que lleve el regex y su estado en true:
+    const categorias = await Categoria.find({
+        nombre: regex,
+        estado: true
+    })
+
+- Cuando tenemos más campos en donde queremos hacer la búsqueda si es necesario 
+utilizar lo del $or o $and
+
+- Le pasamos la respuesta:
+    res.json({
+        results: categorias
+    })
+
+- Solo nos quedaría la parte del buscador de curso que hacemos lo mismo:
+    const buscarCursos = async (termino, res = response) => {
+
+    }
+
+- Y vamos a crear el regex:
+    const buscarCursos = async (termino, res = response) => {
+        const regex = new RegExp(termino, "i");
+
+    }
+
+- Luego creamos la variable:
+    const cursos = await Curso.find({
+        
+    })
+
+- Y aca ya queda a criterio de cada uno, porque lo podemos llamar por
+el nombre, por alguna palabra clave de la descripción. Entonces podemos
+copiar del usuario y le cambiamos el correo por la descripción:
+    const cursos = await Curso.find({
+        $or: [{nombre: regex}, {descripcion: regex}],
+        $and: [{estado:true}]
+    })
+
+- Y por último la response:
+     res.json({
+        results: cursos
+    })
+
+- Entonces como ya tenemos el controlador, podemos llamarlo den las rutas.
+Vamos a ROUTES/BUSCAR e importamos:
+    const {buscar} = require('../controllers/buscar');
+
+- Probamos en POSTMAN y nos tira un error, qué nos falto?...
+El modelo del server
+
+- Vamos a MODELS/SERVER y ponemos:
+    this.buscarPath = "/api/buscar";
+
+- Luego en routes: 
+    this.app.use(this.buscarPath, require ('../routes/buscar'));
+
+- Pruebo en POSTMAN con la ruta:
+    {{url}}/api/buscar/cursos/curs
+
+- Pruebo con esta ruta:
+    {{url}}/api/buscar/hola/curs
+
+- Pruebo con coleccion cambiada:
+    {{url}}/api/buscar/categorias/inf

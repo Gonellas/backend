@@ -13,7 +13,8 @@ class Server{
         this.authPath = '/api/auth'
         this.usersPath = '/api/usuarios';
         this.categoriasPath = "/api/categorias";
-
+        this.cursosPath = "/api/cursos";
+        this.buscarPath = "/api/buscar";
 
         //conectar con base de datos
         this.conectarDB();
@@ -46,6 +47,9 @@ class Server{
         this.app.use(this.authPath, require ('../routes/auth'));
         this.app.use(this.usersPath, require ('../routes/usuarios'));
         this.app.use(this.categoriasPath, require("../routes/categorias"));
+        this.app.use(this.cursosPath, require ('../routes/cursos'));
+        this.app.use(this.buscarPath, require ('../routes/buscar'));
+
         
 
         // //!como no tengo la variable app la tengo que llamar con this 
